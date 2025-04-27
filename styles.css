@@ -1,0 +1,287 @@
+body {
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  background-color: #242e4c;
+  color: #fff;
+  text-align: center;
+  padding: 20px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+h1 {
+  font-size: 2.5rem;
+  margin-bottom: 30px;
+  text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+  animation: glow 2s infinite alternate;
+}
+
+#game, #room-controls {
+  max-width: 800px;
+  margin: 0 auto;
+  background-color: #2c3756;
+  border-radius: 15px;
+  padding: 20px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+#game-stats {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+}
+
+.health-display {
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+#player-health {
+  color: #4caf50;
+}
+
+#opponent-health {
+  color: #f44336;
+}
+
+.turn-indicator {
+  padding: 5px 15px;
+  font-weight: bold;
+  border-radius: 20px;
+  background-color: #333;
+  animation: pulse 1.5s infinite alternate;
+}
+
+#play-area-container {
+  display: flex;
+  justify-content: space-around;
+  margin: 20px 0;
+}
+
+.play-area-section {
+  flex: 1;
+  max-width: 45%;
+  padding: 10px;
+}
+
+.played-card-area {
+  min-height: 150px;
+  border: 2px dashed rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  padding: 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.effect-message {
+  min-height: 60px;
+  margin: 20px 0;
+  font-size: 1.1rem;
+  font-style: italic;
+  color: #ffeb3b;
+}
+
+.bonus {
+  color: #ff9800;
+  font-weight: bold;
+  font-size: 1.2rem;
+}
+
+.player-hand {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin: 20px 0;
+  min-height: 150px;
+}
+
+.card {
+  position: relative;
+  width: 120px;
+  height: 180px;
+  margin: 10px;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background-color: #ddd;
+  color: #000;
+}
+
+.card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 12px 16px rgba(0, 0, 0, 0.4);
+}
+
+.card-element {
+  font-size: 1.2rem;
+  font-weight: bold;
+  padding: 8px;
+  color: white;
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+.card-action {
+  font-size: 1.1rem;
+  padding: 5px;
+  flex-grow: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-power {
+  font-size: 0.9rem;
+  padding: 5px;
+  background-color: rgba(0, 0, 0, 0.7);
+  color: white;
+}
+
+/* Element-specific styles */
+.fire {
+  background: linear-gradient(135deg, #ff5722, #ff9800);
+}
+
+.water {
+  background: linear-gradient(135deg, #03a9f4, #4fc3f7);
+}
+
+.earth {
+  background: linear-gradient(135deg, #8bc34a, #4caf50);
+}
+
+.air {
+  background: linear-gradient(135deg, #eceff1, #b0bec5);
+}
+
+.lightning {
+  background: linear-gradient(135deg, #ffeb3b, #ffc107);
+}
+
+/* Played card styling */
+.played-card {
+  width: 140px;
+  height: 200px;
+  border-radius: 10px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  color: #000;
+  animation: cardEntrance 0.5s ease-out;
+}
+
+/* Button styling */
+.btn {
+  padding: 12px 24px;
+  margin: 10px;
+  font-size: 1rem;
+  font-weight: bold;
+  border: none;
+  border-radius: 30px;
+  background: linear-gradient(to right, #3a7bd5, #00d2ff);
+  color: white;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 10px rgba(0, 0, 0, 0.2);
+  background: linear-gradient(to right, #4a8be5, #10e2ff);
+}
+
+.btn:active {
+  transform: translateY(0);
+}
+
+.rules-box {
+  margin-top: 30px;
+  padding: 15px;
+  border-radius: 10px;
+  background-color: rgba(0, 0, 0, 0.2);
+  text-align: left;
+}
+
+.rules-box ul {
+  padding-left: 25px;
+}
+
+/* Animations */
+@keyframes glow {
+  from {
+    text-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+  }
+  to {
+    text-shadow: 0 0 15px rgba(255, 255, 255, 0.8), 0 0 20px rgba(255, 255, 255, 0.3);
+  }
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.8;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes cardEntrance {
+  from {
+    transform: translateY(50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+#waiting-message {
+  padding: 20px;
+  background-color: #2c3756;
+  border-radius: 15px;
+  margin: 20px auto;
+  max-width: 500px;
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+#room-id-display {
+  font-size: 1.2rem;
+  font-weight: bold;
+  margin-top: 10px;
+  padding: 10px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 5px;
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .play-area-container {
+    flex-direction: column;
+  }
+  
+  .play-area-section {
+    max-width: 100%;
+    margin-bottom: 15px;
+  }
+  
+  .card {
+    width: 100px;
+    height: 150px;
+  }
+  
+  .played-card {
+    width: 120px;
+    height: 170px;
+  }
+}

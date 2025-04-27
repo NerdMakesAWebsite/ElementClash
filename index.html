@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Element Clash 🌟</title>
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="NLC Profile.png">
+  
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <h1>Element Clash 🌟</h1>
+  
+  <div id="waiting-message" style="display: none;">
+    <p>Waiting for another player to join...</p>
+    <div id="room-id-display"></div>
+  </div>
+  
+  <div id="room-controls">
+    <h2>Welcome to Element Clash!</h2>
+    <p>Create a new game room or join an existing one to start playing.</p>
+    <button onclick="createRoom()" class="btn">Create Game Room</button>
+    <button onclick="joinExistingRoom()" class="btn">Join Game Room</button>
+  </div>
+  
+  <div id="game" style="display: none;">
+    <div id="game-stats">
+      <div class="health-display">
+        <span>Your Health: </span><span id="player-health">20</span>
+      </div>
+      <div class="health-display">
+        <span>Opponent Health: </span><span id="opponent-health">20</span>
+      </div>
+      <div id="turn-indicator" class="turn-indicator">Waiting...</div>
+    </div>
+    
+    <div id="play-area-container">
+      <div class="play-area-section">
+        <h3>Opponent's Card</h3>
+        <div id="opponent-played-card" class="played-card-area"></div>
+      </div>
+      <div class="play-area-section">
+        <h3>Your Card</h3>
+        <div id="play-area" class="played-card-area">No card played yet</div>
+      </div>
+    </div>
+    
+    <div id="effect-message" class="effect-message"></div>
+    
+    <h3>Your Hand</h3>
+    <div id="player-hand" class="player-hand"></div>
+    
+    <button onclick="drawCard()" class="btn" id="draw-button">Draw Card</button>
+    
+    <div class="rules-box">
+      <h3>Game Rules:</h3>
+      <ul>
+        <li>Each player starts with 20 health</li>
+        <li>Draw cards on your turn</li>
+        <li>Elements have strengths: Fire > Air > Earth > Water > Lightning > Fire</li>
+        <li>Actions:
+          <ul>
+            <li>Attack - Deal damage equal to card power</li>
+            <li>Shield - Gain health equal to half card power</li>
+            <li>Heal - Gain health equal to card power</li>
+            <li>Teleport - Draw an extra card</li>
+            <li>Double Attack - Deal double damage</li>
+          </ul>
+        </li>
+        <li>Matching an element against its weakness doubles the effect!</li>
+      </ul>
+    </div>
+  </div>
+  
+  <!-- Firebase App (core) -->
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-app-compat.js"></script>
+  
+  <!-- Firebase Firestore -->
+  <script src="https://www.gstatic.com/firebasejs/10.5.2/firebase-firestore-compat.js"></script>
+  
+  <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAv381GcmOteTCiFjyoWkRIc3GM9AraB6s",
+  authDomain: "nj-elementclash.firebaseapp.com",
+  projectId: "nj-elementclash",
+  storageBucket: "nj-elementclash.firebasestorage.app",
+  messagingSenderId: "856532119848",
+  appId: "1:856532119848:web:1e4285e16b77b5363be01d"
+};
+    
+    // Initialize Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+  </script>
+  
+  <script src="game.js"></script>
+</body>
+</html>

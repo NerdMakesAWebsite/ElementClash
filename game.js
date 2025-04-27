@@ -19,6 +19,7 @@ let currentRoom = null;
 let playerId = null;
 let isPlayerTurn = false;
 let unsubscribe = null;
+let gameEnded = false; // Track if game has ended
 
 // Generate a random card with element, action and power value
 function getRandomCard() {
@@ -43,7 +44,7 @@ function updateUI() {
 
 // Draw a card and add it to the player's hand
 function drawCard() {
-  if (!currentRoom || !isPlayerTurn) return;
+  if (!currentRoom || !isPlayerTurn || gameEnded) return;
   
   if (playerHand.length < 7) { // Limit hand size
     const card = getRandomCard();
@@ -69,7 +70,7 @@ function drawCard() {
 
 // Play a card from the player's hand
 function playCard(index) {
-  if (!currentRoom || !isPlayerTurn) return;
+  if (!currentRoom || !isPlayerTurn || gameEnded) return;
   
   const card = playerHand.splice(index, 1)[0];
   
@@ -88,8 +89,10 @@ function playCard(index) {
   // Apply card effect
   applyCardEffect(card);
   
-  // End turn
-  endTurn(card);
+  if (!gameEnded) {
+    // End turn only if game is still active
+    endTurn(card);
+  }
 }
 
 // Apply the effect of the played card
@@ -137,7 +140,10 @@ function applyCardEffect(card) {
   document.getElementById('effect-message').innerHTML = effectMessage;
   
   // Check for game over
-  checkGameOver();
+  if (checkGameOver()) {
+    // If game is over, don't proceed with turn end
+    return;
+  }
   
   // Update the UI
   updateUI();
@@ -145,7 +151,7 @@ function applyCardEffect(card) {
 
 // End the current player's turn
 function endTurn(playedCard) {
-  if (!currentRoom) return;
+  if (!currentRoom || gameEnded) return;
   
   isPlayerTurn = false;
   updateUI();
@@ -186,20 +192,38 @@ function updateHand() {
       <div class="card-action">${card.action}</div>
       <div class="card-power">Power: ${card.power}</div>
     `;
-    cardDiv.onclick = () => isPlayerTurn ? playCard(index) : alert("Wait for your turn!");
+    cardDiv.onclick = () => (!gameEnded && isPlayerTurn) ? playCard(index) : 
+                             gameEnded ? alert("Game already ended!") : alert("Wait for your turn!");
     handDiv.appendChild(cardDiv);
   });
 }
 
 // Check if the game is over
 function checkGameOver() {
-  if (playerHealth <= 0) {
-    alert("Game Over! You lost!");
-    resetGame();
-    return true;
-  } else if (opponentHealth <= 0) {
-    alert("Congratulations! You won!");
-    resetGame();
+  if (playerHealth <= 0 || opponentHealth <= 0) {
+    gameEnded = true;
+    
+    // Show game over message once
+    if (playerHealth <= 0) {
+      alert("Game Over! You lost!");
+    } else {
+      alert("Congratulations! You won!");
+    }
+    
+    // Update game state in Firestore with winner info
+    if (currentRoom) {
+      const gameStateRef = db.collection('rooms').doc(currentRoom).collection('gameState').doc('current');
+      gameStateRef.update({
+        gameActive: false,
+        winner: opponentHealth <= 0 ? playerId : null
+      }).catch(error => {
+        console.error("Error updating game state:", error);
+      });
+    }
+    
+    // Disable draw button
+    document.getElementById('draw-button').disabled = true;
+    
     return true;
   }
   return false;
@@ -207,26 +231,36 @@ function checkGameOver() {
 
 // Reset the game
 function resetGame() {
-  playerHand = [];
-  playerHealth = 20;
-  opponentHealth = 20;
-  isPlayerTurn = false;
-  
-  // If in a room, update game state
-  if (currentRoom) {
-    const gameStateRef = db.collection('rooms').doc(currentRoom).collection('gameState').doc('current');
-    gameStateRef.update({
-      gameActive: false,
-      winner: playerHealth > 0 ? playerId : null
-    });
+  if (!gameEnded) {
+    playerHand = [];
+    playerHealth = 20;
+    opponentHealth = 20;
+    isPlayerTurn = false;
+    gameEnded = false;
+    
+    // Re-enable draw button
+    if (document.getElementById('draw-button')) {
+      document.getElementById('draw-button').disabled = false;
+    }
+    
+    // Clear play areas
+    document.getElementById('play-area').innerHTML = 'No card played yet';
+    document.getElementById('opponent-played-card').innerHTML = '';
+    document.getElementById('effect-message').innerHTML = '';
+    
+    updateUI();
   }
-  
-  updateUI();
 }
 
 // Create a new game room
 async function createRoom() {
   try {
+    // Reset game state
+    gameEnded = false;
+    playerHand = [];
+    playerHealth = 20;
+    opponentHealth = 20;
+    
     // Generate a unique player ID
     playerId = `player_${Date.now()}_${Math.floor(Math.random()*1000)}`;
     
@@ -249,8 +283,14 @@ async function createRoom() {
       player1Hand: [],
       player2Hand: [],
       lastPlayedCard: null,
-      gameActive: false
+      gameActive: false,
+      winner: null
     });
+    
+    // Re-enable draw button
+    if (document.getElementById('draw-button')) {
+      document.getElementById('draw-button').disabled = false;
+    }
     
     // Subscribe to game state changes
     subscribeToGameState();
@@ -273,6 +313,12 @@ async function joinExistingRoom() {
   if (!roomId) return;
   
   try {
+    // Reset game state
+    gameEnded = false;
+    playerHand = [];
+    playerHealth = 20;
+    opponentHealth = 20;
+    
     const roomRef = db.collection('rooms').doc(roomId);
     const roomSnap = await roomRef.get();
     
@@ -284,7 +330,7 @@ async function joinExistingRoom() {
     const roomData = roomSnap.data();
     
     // Check if room is full
-    if (roomData.players.length >= 2) {
+    if (roomData.players && roomData.players.length >= 2) {
       alert("Room is full!");
       return;
     }
@@ -307,10 +353,16 @@ async function joinExistingRoom() {
     await gameStateRef.update({
       player2Id: playerId,
       currentTurn: gameStateData.player1Id, // First player starts
-      gameActive: true
+      gameActive: true,
+      winner: null
     });
     
     currentRoom = roomId;
+    
+    // Re-enable draw button
+    if (document.getElementById('draw-button')) {
+      document.getElementById('draw-button').disabled = false;
+    }
     
     // Subscribe to game state changes
     subscribeToGameState();
@@ -345,14 +397,33 @@ function subscribeToGameState() {
   unsubscribe = db.collection('rooms').doc(currentRoom).collection('gameState').doc('current')
     .onSnapshot(snapshot => {
       const data = snapshot.data();
+      if (!data) return;
       
       // Check if game is active
       if (!data.gameActive) {
-        if (data.winner) {
-          alert(data.winner === playerId ? "You won!" : "You lost!");
+        // Only show win/lose message if game just ended and we haven't processed it yet
+        if (!gameEnded && data.winner !== undefined) {
+          gameEnded = true;
+          
+          // Only show the alert if this is a real game end, not just joining an inactive game
+          if (data.player1Id && data.player2Id) {
+            if (data.winner === playerId) {
+              alert("You won!");
+            } else if (data.winner === null && playerId) {
+              alert("You lost!");
+            }
+          }
+          
+          // Disable draw button
+          document.getElementById('draw-button').disabled = true;
         }
-        resetGame();
         return;
+      }
+      
+      // Reset gameEnded flag if game becomes active again
+      if (data.gameActive && gameEnded) {
+        gameEnded = false;
+        document.getElementById('draw-button').disabled = false;
       }
       
       // If player2 just joined, initialize player1's hand
@@ -374,12 +445,12 @@ function subscribeToGameState() {
       if (playerId === data.player1Id) {
         playerHealth = data.player1Health;
         opponentHealth = data.player2Health;
-        playerHand = data.player1Hand || [];
+        if (data.player1Hand) playerHand = data.player1Hand;
         isPlayerTurn = data.currentTurn === playerId;
       } else {
         playerHealth = data.player2Health;
         opponentHealth = data.player1Health;
-        playerHand = data.player2Hand || [];
+        if (data.player2Hand) playerHand = data.player2Hand;
         isPlayerTurn = data.currentTurn === playerId;
       }
       
@@ -396,8 +467,13 @@ function subscribeToGameState() {
         opponentPlayArea.setAttribute('data-element', data.lastPlayedCard.element);
       }
       
+      // Check for game over again based on updated health values
+      checkGameOver();
+      
       // Update UI
       updateUI();
+    }, error => {
+      console.error("Error in snapshot listener:", error);
     });
 }
 
@@ -408,6 +484,9 @@ function initGame() {
   
   // Initialize UI
   updateUI();
+  
+  // Reset game state
+  gameEnded = false;
 }
 
 // Initialize when page loads

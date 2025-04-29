@@ -42,6 +42,36 @@ function updateUI() {
   updateHand();
 }
 
+// Show a custom notification
+function showNotification(message, type = 'info', duration = 3000) {
+  // Remove any existing notifications
+  const existingNotification = document.querySelector('.game-notification');
+  if (existingNotification) {
+    existingNotification.remove();
+  }
+  
+  // Create new notification
+  const notification = document.createElement('div');
+  notification.className = `game-notification notification-${type}`;
+  notification.innerText = message;
+  
+  // Add to document
+  document.body.appendChild(notification);
+  
+  // Trigger animation
+  setTimeout(() => {
+    notification.classList.add('notification-show');
+  }, 10);
+  
+  // Hide after duration
+  setTimeout(() => {
+    notification.classList.remove('notification-show');
+    setTimeout(() => {
+      notification.remove();
+    }, 300);
+  }, duration);
+}
+
 // Draw a card and add it to the player's hand
 function drawCard() {
   if (!currentRoom || !isPlayerTurn || gameEnded) return;
@@ -70,7 +100,14 @@ function drawCard() {
 
 // Play a card from the player's hand
 function playCard(index) {
-  if (!currentRoom || !isPlayerTurn || gameEnded) return;
+  if (!currentRoom || !isPlayerTurn || gameEnded) {
+    if (gameEnded) {
+      showNotification("Game already ended!", "info");
+    } else if (!isPlayerTurn) {
+      showNotification("Wait for your turn!", "info");
+    }
+    return;
+  }
   
   const card = playerHand.splice(index, 1)[0];
   
@@ -203,11 +240,11 @@ function checkGameOver() {
   if (playerHealth <= 0 || opponentHealth <= 0) {
     gameEnded = true;
     
-    // Show game over message once
+    // Show game over notification based on outcome
     if (playerHealth <= 0) {
-      alert("Game Over! You lost!");
+      showNotification("Game Over! You lost!", "error", 5000);
     } else {
-      alert("Congratulations! You won!");
+      showNotification("Congratulations! You won!", "success", 5000);
     }
     
     // Update game state in Firestore with winner info
@@ -300,10 +337,10 @@ async function createRoom() {
     document.getElementById('waiting-message').style.display = 'block';
     document.getElementById('room-controls').style.display = 'none';
     
-    alert(`Room Created! Share this Room ID with your opponent: ${currentRoom}`);
+    showNotification(`Room Created! Share this Room ID with your opponent: ${currentRoom}`, "success", 7000);
   } catch (error) {
     console.error("Error creating room:", error);
-    alert("Error creating room. Please try again.");
+    showNotification("Error creating room. Please try again.", "error");
   }
 }
 
@@ -323,7 +360,7 @@ async function joinExistingRoom() {
     const roomSnap = await roomRef.get();
     
     if (!roomSnap.exists) {
-      alert("Room not found!");
+      showNotification("Room not found!", "error");
       return;
     }
     
@@ -331,7 +368,7 @@ async function joinExistingRoom() {
     
     // Check if room is full
     if (roomData.players && roomData.players.length >= 2) {
-      alert("Room is full!");
+      showNotification("Room is full!", "error");
       return;
     }
     
@@ -381,10 +418,10 @@ async function joinExistingRoom() {
     document.getElementById('room-controls').style.display = 'none';
     document.getElementById('game').style.display = 'block';
     
-    alert("Joined room successfully! Wait for your turn.");
+    showNotification("Joined room successfully! Wait for your turn.", "success");
   } catch (error) {
     console.error("Error joining room:", error);
-    alert("Error joining room. Please try again.");
+    showNotification("Error joining room. Please try again.", "error");
   }
 }
 
@@ -402,15 +439,15 @@ function subscribeToGameState() {
       // Check if game is active
       if (!data.gameActive) {
         // Only show win/lose message if game just ended and we haven't processed it yet
-        if (!gameEnded && data.winner !== undefined) {
+        if (!gameEnded && data.player1Id && data.player2Id) {
           gameEnded = true;
           
-          // Only show the alert if this is a real game end, not just joining an inactive game
-          if (data.player1Id && data.player2Id) {
+          // If there's a winner defined
+          if (data.winner !== null) {
             if (data.winner === playerId) {
-              alert("You won!");
-            } else if (data.winner === null && playerId) {
-              alert("You lost!");
+              showNotification("You won!", "success", 5000);
+            } else {
+              showNotification("You lost!", "error", 5000);
             }
           }
           
@@ -439,6 +476,9 @@ function subscribeToGameState() {
         
         document.getElementById('waiting-message').style.display = 'none';
         document.getElementById('game').style.display = 'block';
+        
+        // Notify player that opponent joined
+        showNotification("Opponent joined! Game started.", "info");
       }
       
       // Update game state based on Firestore data
@@ -452,6 +492,11 @@ function subscribeToGameState() {
         opponentHealth = data.player1Health;
         if (data.player2Hand) playerHand = data.player2Hand;
         isPlayerTurn = data.currentTurn === playerId;
+      }
+      
+      // Notify player when it's their turn
+      if (isPlayerTurn && data.lastPlayedCard) {
+        showNotification("It's your turn!", "info", 2000);
       }
       
       // Update opponent's last played card
@@ -474,6 +519,7 @@ function subscribeToGameState() {
       updateUI();
     }, error => {
       console.error("Error in snapshot listener:", error);
+      showNotification("Connection error. Please reload the page.", "error");
     });
 }
 

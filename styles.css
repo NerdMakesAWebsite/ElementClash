@@ -700,5 +700,95 @@ h3 {
   }
 }
 
+.game-controls-container {
+  margin: 40px auto 30px;
+  padding: 25px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 15px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+  animation: fadeIn 0.8s ease-out;
+  max-width: 600px;
+}
+
+.game-controls-container h3 {
+  color: #ffeb3b;
+  text-shadow: 0 0 10px rgba(255, 235, 59, 0.5);
+  font-size: 1.5rem;
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.game-control-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 25px;
+  flex-wrap: wrap;
+}
+
+/* Play again button specific styling */
+.btn-play-again {
+  background: linear-gradient(to right, #4CAF50, #8BC34A);
+  box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3), 0 0 5px rgba(139, 195, 74, 0.5);
+}
+
+.btn-play-again:hover {
+  background: linear-gradient(-45deg, #5bc75e, #9cda5a);
+  box-shadow: 0 8px 20px rgba(76, 175, 80, 0.4), 0 0 10px rgba(139, 195, 74, 0.7);
+}
+
+.btn-play-again::before {
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+}
+
+/* Leave game button specific styling */
+.btn-leave-game {
+  background: linear-gradient(to right, #FF5722, #F44336);
+  box-shadow: 0 5px 15px rgba(244, 67, 54, 0.3), 0 0 5px rgba(255, 87, 34, 0.5);
+}
+
+.btn-leave-game:hover {
+  background: linear-gradient(-45deg, #ff6a3c, #ff5252);
+  box-shadow: 0 8px 20px rgba(244, 67, 54, 0.4), 0 0 10px rgba(255, 87, 34, 0.7);
+}
+
+.btn-leave-game::before {
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
+}
+
+/* Animation for the game controls appearance */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Responsive styling for the game controls */
+@media (max-width: 768px) {
+  .game-controls-container {
+    padding: 20px;
+  }
+  
+  .game-control-buttons {
+    gap: 15px;
+  }
+}
+
+@media (max-width: 480px) {
+  .game-controls-container h3 {
+    font-size: 1.3rem;
+  }
+  
+  .btn-play-again, .btn-leave-game {
+    padding: 12px 20px;
+    font-size: 0.9rem;
+  }
+}
+
 /* Optional Google Font */
 @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap');

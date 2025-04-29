@@ -20,6 +20,7 @@ let playerId = null;
 let isPlayerTurn = false;
 let unsubscribe = null;
 let gameEnded = false; // Track if game has ended
+let opponentId = null; // Track opponent's ID
 
 // Generate a random card with element, action and power value
 function getRandomCard() {
@@ -40,6 +41,12 @@ function updateUI() {
   
   // Update hand
   updateHand();
+  
+  // Show/hide game control buttons based on game state
+  const gameControlsDiv = document.getElementById('game-controls');
+  if (gameControlsDiv) {
+    gameControlsDiv.style.display = gameEnded ? 'block' : 'none';
+  }
 }
 
 // Show a custom notification
@@ -261,32 +268,145 @@ function checkGameOver() {
     // Disable draw button
     document.getElementById('draw-button').disabled = true;
     
+    // Show game control buttons
+    document.getElementById('game-controls').style.display = 'block';
+    
     return true;
   }
   return false;
 }
 
-// Reset the game
-function resetGame() {
-  if (!gameEnded) {
+// Reset the game for a rematch
+function playAgain() {
+  if (!currentRoom) return;
+  
+  // Reset local game state
+  playerHand = [];
+  playerHealth = 20;
+  opponentHealth = 20;
+  isPlayerTurn = false;
+  gameEnded = false;
+  
+  // Re-enable draw button
+  document.getElementById('draw-button').disabled = false;
+  
+  // Hide game controls
+  document.getElementById('game-controls').style.display = 'none';
+  
+  // Clear play areas
+  document.getElementById('play-area').innerHTML = 'No card played yet';
+  document.getElementById('opponent-played-card').innerHTML = '';
+  document.getElementById('effect-message').innerHTML = '';
+  
+  // Initialize hand with 3 cards
+  for (let i = 0; i < 3; i++) {
+    playerHand.push(getRandomCard());
+  }
+  
+  // Update game state in Firestore
+  const gameStateRef = db.collection('rooms').doc(currentRoom).collection('gameState').doc('current');
+  gameStateRef.get().then(doc => {
+    const data = doc.data();
+    
+    // Determine which player is requesting the rematch
+    const isPlayer1 = playerId === data.player1Id;
+    
+    const updates = {
+      player1Health: 20,
+      player2Health: 20,
+      lastPlayedCard: null,
+      gameActive: true,
+      winner: null,
+      currentTurn: data.player1Id, // First player always starts
+      rematchRequestedBy: playerId // Mark who requested the rematch
+    };
+    
+    if (isPlayer1) {
+      updates.player1Hand = playerHand;
+    } else {
+      updates.player2Hand = playerHand;
+    }
+    
+    gameStateRef.update(updates).then(() => {
+      showNotification("Rematch requested! Waiting for opponent...", "info");
+      updateUI();
+    }).catch(error => {
+      console.error("Error requesting rematch:", error);
+      showNotification("Error requesting rematch. Please try again.", "error");
+    });
+  });
+}
+
+// Leave the current game room
+function leaveGame() {
+  if (!currentRoom) return;
+  
+  // If we have an active listener, unsubscribe
+  if (unsubscribe) {
+    unsubscribe();
+    unsubscribe = null;
+  }
+  
+  // Update room status in Firestore
+  const roomRef = db.collection('rooms').doc(currentRoom);
+  roomRef.get().then(doc => {
+    const data = doc.data();
+    const players = data.players || [];
+    
+    // Remove the current player from the players array
+    const updatedPlayers = players.filter(player => player !== playerId);
+    
+    // If there are no players left, mark the room as expired
+    // Otherwise, just remove the current player
+    const updates = {
+      players: updatedPlayers,
+      expired: updatedPlayers.length === 0 ? true : data.expired || false
+    };
+    
+    return roomRef.update(updates);
+  }).then(() => {
+    // Get game state ref
+    const gameStateRef = db.collection('rooms').doc(currentRoom).collection('gameState').doc('current');
+    
+    // Update game state to notify other player that this player left
+    return gameStateRef.get().then(doc => {
+      if (!doc.exists) return;
+      
+      const data = doc.data();
+      const updates = {
+        gameActive: false,
+        playerLeft: playerId
+      };
+      
+      // Clear player data
+      if (playerId === data.player1Id) {
+        updates.player1Id = null;
+      } else if (playerId === data.player2Id) {
+        updates.player2Id = null;
+      }
+      
+      return gameStateRef.update(updates);
+    });
+  }).then(() => {
+    // Reset local game state
     playerHand = [];
     playerHealth = 20;
     opponentHealth = 20;
     isPlayerTurn = false;
     gameEnded = false;
+    currentRoom = null;
+    opponentId = null;
     
-    // Re-enable draw button
-    if (document.getElementById('draw-button')) {
-      document.getElementById('draw-button').disabled = false;
-    }
+    // Show room controls and hide game
+    document.getElementById('waiting-message').style.display = 'none';
+    document.getElementById('game').style.display = 'none';
+    document.getElementById('room-controls').style.display = 'block';
     
-    // Clear play areas
-    document.getElementById('play-area').innerHTML = 'No card played yet';
-    document.getElementById('opponent-played-card').innerHTML = '';
-    document.getElementById('effect-message').innerHTML = '';
-    
-    updateUI();
-  }
+    showNotification("You left the game room.", "info");
+  }).catch(error => {
+    console.error("Error leaving room:", error);
+    showNotification("Error leaving room. Please try again.", "error");
+  });
 }
 
 // Create a new game room
@@ -305,7 +425,8 @@ async function createRoom() {
     const roomRef = await db.collection('rooms').add({
       createdAt: Date.now(),
       players: [playerId],
-      gameActive: false
+      gameActive: false,
+      expired: false
     });
     
     currentRoom = roomRef.id;
@@ -321,7 +442,9 @@ async function createRoom() {
       player2Hand: [],
       lastPlayedCard: null,
       gameActive: false,
-      winner: null
+      winner: null,
+      rematchRequestedBy: null,
+      playerLeft: null
     });
     
     // Re-enable draw button
@@ -426,10 +549,23 @@ async function processJoinRoom(roomId) {
     
     const roomData = roomSnap.data();
     
-    // Check if room is full
-    if (roomData.players && roomData.players.length >= 2) {
-      showNotification("Room is full!", "error");
+    // Check if room is expired
+    if (roomData.expired) {
+      showNotification("This room has expired!", "error");
       return;
+    }
+    
+    // Check if room is full (both players are active)
+    const gameStateRef = db.collection('rooms').doc(roomId).collection('gameState').doc('current');
+    const gameStateSnap = await gameStateRef.get();
+    
+    if (gameStateSnap.exists) {
+      const gameStateData = gameStateSnap.data();
+      if (gameStateData.player1Id && gameStateData.player2Id && 
+          gameStateData.player1Id !== null && gameStateData.player2Id !== null) {
+        showNotification("Room is full!", "error");
+        return;
+      }
     }
     
     // Generate a unique player ID
@@ -442,16 +578,19 @@ async function processJoinRoom(roomId) {
     });
     
     // Get game state reference
-    const gameStateRef = db.collection('rooms').doc(roomId).collection('gameState').doc('current');
-    const gameStateSnap = await gameStateRef.get();
     const gameStateData = gameStateSnap.data();
+    
+    // Store opponent ID
+    opponentId = gameStateData.player1Id;
     
     // Update game state
     await gameStateRef.update({
       player2Id: playerId,
       currentTurn: gameStateData.player1Id, // First player starts
       gameActive: true,
-      winner: null
+      winner: null,
+      rematchRequestedBy: null,
+      playerLeft: null
     });
     
     currentRoom = roomId;
@@ -506,6 +645,55 @@ function subscribeToGameState() {
       const data = snapshot.data();
       if (!data) return;
       
+      // Store opponent's ID
+      if (playerId === data.player1Id && data.player2Id) {
+        opponentId = data.player2Id;
+      } else if (playerId === data.player2Id && data.player1Id) {
+        opponentId = data.player1Id;
+      }
+      
+      // Check if opponent left the game
+      if (data.playerLeft && data.playerLeft !== playerId) {
+        showNotification("Opponent left the game!", "info", 5000);
+        gameEnded = true;
+        document.getElementById('draw-button').disabled = true;
+        document.getElementById('game-controls').style.display = 'block';
+      }
+      
+      // Handle rematch requests
+      if (data.rematchRequestedBy && data.rematchRequestedBy !== playerId) {
+        // Opponent requested a rematch
+        showNotification("Opponent wants a rematch! Click 'Play Again' to accept.", "info", 5000);
+      }
+      
+      // If both players requested rematch, start new game
+      if (data.rematchRequestedBy && data.gameActive && !gameEnded) {
+        // Reset game state
+        gameEnded = false;
+        document.getElementById('draw-button').disabled = false;
+        document.getElementById('game-controls').style.display = 'none';
+        
+        // Clear play areas
+        document.getElementById('play-area').innerHTML = 'No card played yet';
+        document.getElementById('opponent-played-card').innerHTML = '';
+        document.getElementById('effect-message').innerHTML = '';
+        
+        // If player is player2 and doesn't have cards yet, initialize hand
+        if (playerId === data.player2Id && (data.player2Hand === undefined || data.player2Hand.length === 0)) {
+          playerHand = [];
+          for (let i = 0; i < 3; i++) {
+            playerHand.push(getRandomCard());
+          }
+          
+          // Update player hand in Firestore
+          snapshot.ref.update({
+            player2Hand: playerHand
+          });
+        }
+        
+        showNotification("Game restarted! A new match begins.", "success");
+      }
+      
       // Check if game is active
       if (!data.gameActive) {
         // Only show win/lose message if game just ended and we haven't processed it yet
@@ -523,6 +711,9 @@ function subscribeToGameState() {
           
           // Disable draw button
           document.getElementById('draw-button').disabled = true;
+          
+          // Show game controls
+          document.getElementById('game-controls').style.display = 'block';
         }
         return;
       }
@@ -531,6 +722,7 @@ function subscribeToGameState() {
       if (data.gameActive && gameEnded) {
         gameEnded = false;
         document.getElementById('draw-button').disabled = false;
+        document.getElementById('game-controls').style.display = 'none';
       }
       
       // If player2 just joined, initialize player1's hand
@@ -605,5 +797,26 @@ function initGame() {
   gameEnded = false;
 }
 
+// Clean up expired rooms (can be called periodically)
+function cleanupExpiredRooms() {
+  const cutoffTime = Date.now() - (24 * 60 * 60 * 1000); // 24 hours ago
+  
+  db.collection('rooms')
+    .where('createdAt', '<', cutoffTime)
+    .get()
+    .then(snapshot => {
+      snapshot.forEach(doc => {
+        db.collection('rooms').doc(doc.id).update({
+          expired: true
+        });
+      });
+    });
+}
+
 // Initialize when page loads
-window.onload = initGame;
+window.onload = function() {
+  initGame();
+  
+  // Set up a timer to clean up expired rooms every hour
+  setInterval(cleanupExpiredRooms, 60 * 60 * 1000);
+};

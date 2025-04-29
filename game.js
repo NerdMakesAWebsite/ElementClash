@@ -337,19 +337,79 @@ async function createRoom() {
     document.getElementById('waiting-message').style.display = 'block';
     document.getElementById('room-controls').style.display = 'none';
     
-    showNotification(`Room Created! Share this Room ID with your opponent: ${currentRoom}`, "success", 7000);
+    showNotification(`Room Created! Share the Room ID with your opponent.`, "success", 7000);
   } catch (error) {
     console.error("Error creating room:", error);
     showNotification("Error creating room. Please try again.", "error");
   }
 }
 
-// Join an existing game room
-async function joinExistingRoom() {
-  const roomId = prompt("Enter Room ID:");
-  if (!roomId) return;
+function createJoinRoomDialog() {
+  // Check if dialog already exists
+  if (document.getElementById('join-room-dialog')) return;
+
+  const dialogHTML = `
+    <div id="join-room-dialog" class="game-dialog">
+      <div class="dialog-content">
+        <h3>Join Game Room</h3>
+        <div class="input-group">
+          <label for="room-id-input">Room ID:</label>
+          <input type="text" id="room-id-input" placeholder="Enter Room ID">
+        </div>
+        <div class="button-group">
+          <button id="join-room-confirm" class="primary-button">Join</button>
+          <button id="join-room-cancel" class="secondary-button">Cancel</button>
+        </div>
+      </div>
+    </div>
+  `;
   
+  // Create dialog element
+  const dialogContainer = document.createElement('div');
+  dialogContainer.innerHTML = dialogHTML;
+  document.body.appendChild(dialogContainer.firstElementChild);
+  
+  // Add event listeners
+  document.getElementById('join-room-confirm').addEventListener('click', confirmJoinRoom);
+  document.getElementById('join-room-cancel').addEventListener('click', closeJoinRoomDialog);
+}
+
+// Close the join room dialog
+function closeJoinRoomDialog() {
+  const dialog = document.getElementById('join-room-dialog');
+  if (dialog) {
+    dialog.classList.add('dialog-closing');
+    setTimeout(() => {
+      dialog.remove();
+    }, 300);
+  }
+}
+
+// Handle the room join confirmation
+function confirmJoinRoom() {
+  const roomIdInput = document.getElementById('room-id-input');
+  const roomId = roomIdInput.value.trim();
+  
+  if (!roomId) {
+    // Highlight the input field if empty
+    roomIdInput.classList.add('input-error');
+    setTimeout(() => roomIdInput.classList.remove('input-error'), 1000);
+    return;
+  }
+  
+  // Close dialog
+  closeJoinRoomDialog();
+  
+  // Process the room joining
+  processJoinRoom(roomId);
+}
+
+// Process joining the room with the provided ID
+async function processJoinRoom(roomId) {
   try {
+    // Show loading indicator
+    showNotification("Connecting to room...", "info");
+    
     // Reset game state
     gameEnded = false;
     playerHand = [];
@@ -423,6 +483,16 @@ async function joinExistingRoom() {
     console.error("Error joining room:", error);
     showNotification("Error joining room. Please try again.", "error");
   }
+}
+
+function joinExistingRoom() {
+  createJoinRoomDialog();
+  
+  // Add animation class after a short delay to trigger transition
+  setTimeout(() => {
+    const dialog = document.getElementById('join-room-dialog');
+    if (dialog) dialog.classList.add('dialog-active');
+  }, 10);
 }
 
 // Subscribe to game state changes

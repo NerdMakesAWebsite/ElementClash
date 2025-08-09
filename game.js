@@ -822,6 +822,46 @@ function leaveGame() {
   });
 }
 
+// ADD THESE NEW FUNCTIONS - Put them anywhere in your JavaScript file (I recommend after the game constants section)
+
+// Generate a short, unique room ID (6-character alphanumeric)
+function generateRoomId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Removed confusing chars like 0, O, 1, I
+  let roomId = '';
+  for (let i = 0; i < 6; i++) {
+    roomId += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return roomId;
+}
+
+// Check if room ID already exists
+async function isRoomIdAvailable(roomId) {
+  try {
+    const roomRef = db.collection('rooms').doc(roomId);
+    const doc = await roomRef.get();
+    return !doc.exists;
+  } catch (error) {
+    console.error('Error checking room availability:', error);
+    return false;
+  }
+}
+
+// Generate unique room ID with collision checking
+async function generateUniqueRoomId(maxAttempts = 10) {
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const roomId = generateRoomId();
+    
+    if (await isRoomIdAvailable(roomId)) {
+      return roomId;
+    }
+  }
+  
+  // Fallback to timestamp-based ID if all attempts fail
+  return `ROOM${Date.now().toString().slice(-6)}`;
+}
+
+// REPLACE YOUR EXISTING createRoom() FUNCTION WITH THIS:
+
 // Create a new game room
 async function createRoom() {
   try {
@@ -838,23 +878,25 @@ async function createRoom() {
     // Generate a unique player ID
     playerId = `player_${Date.now()}_${Math.floor(Math.random()*1000)}`;
     
-    // Create a new room in Firestore
-    const roomRef = await db.collection('rooms').add({
+    // Generate a unique room ID (NEW - replaces Firestore auto-generation)
+    const roomId = await generateUniqueRoomId();
+    currentRoom = roomId;
+    
+    // Create room with custom ID instead of auto-generated (CHANGED)
+    await db.collection('rooms').doc(roomId).set({
       createdAt: Date.now(),
       players: [playerId],
       gameActive: false,
       expired: false
     });
     
-    currentRoom = roomRef.id;
-    
     // Create initial game state
     await db.collection('rooms').doc(currentRoom).collection('gameState').doc('current').set({
       player1Id: playerId,
       player2Id: null,
       currentTurn: null,
-      player1Health: 20,
-      player2Health: 20,
+      player1Health: 30,
+      player2Health: 30,
       player1Hand: [],
       player2Hand: [],
       lastPlayedCard: null,
@@ -885,7 +927,7 @@ async function createRoom() {
     document.getElementById('waiting-message').style.display = 'block';
     document.getElementById('room-controls').style.display = 'none';
     
-    showNotification(`Room Created! Share the Room ID with your opponent.`, "success", 7000);
+    showNotification(`Room Created! Share Room ID: ${currentRoom}`, "success", 7000);
   } catch (error) {
     console.error("Error creating room:", error);
     showNotification("Error creating room. Please try again.", "error");
@@ -936,7 +978,10 @@ function closeJoinRoomDialog() {
 // Handle the room join confirmation
 function confirmJoinRoom() {
   const roomIdInput = document.getElementById('room-id-input');
-  const roomId = roomIdInput.value.trim();
+  let roomId = roomIdInput.value.trim().toUpperCase(); // Convert to uppercase for consistency
+  
+  // Remove any spaces or special characters
+  roomId = roomId.replace(/[^A-Z0-9]/g, '');
   
   if (!roomId) {
     // Highlight the input field if empty
@@ -944,6 +989,9 @@ function confirmJoinRoom() {
     setTimeout(() => roomIdInput.classList.remove('input-error'), 1000);
     return;
   }
+  
+  // Update the input field to show cleaned room ID
+  roomIdInput.value = roomId;
   
   // Close dialog
   closeJoinRoomDialog();

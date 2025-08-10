@@ -248,8 +248,11 @@ function applyElementSpecial(card) {
       specialMessage = "Your shields are fortified! Shield effects are 50% stronger.";
       break;
     case "Gust":
-      skipNextTurn = true;
-      specialMessage = "You summoned a powerful gust! Opponent will skip their next turn.";
+	  // 30% chance to skip
+	  if (Math.random() < 0.3) {
+		skipNextTurn = true;
+		specialMessage = "You summoned a powerful gust! Opponent will skip their next turn.";
+	  }
       break;
     case "Shock":
       // 50% chance to stun
@@ -405,10 +408,13 @@ function applyCardEffect(card) {
       break;
   }
   
-  // Apply element special ability
-  const specialMessage = applyElementSpecial(card);
-  if (specialMessage) {
-    effectMessage += `<br><span class="special">${specialMessage}</span>`;
+  // 30% chance for special abilities to trigger
+  const specialChance = 0.3;
+  if (Math.random() < specialChance) {
+    const specialMessage = applyElementSpecial(card);
+    if (specialMessage) {
+      effectMessage += `<br><span class="special">${specialMessage}</span>`;
+    }
   }
   
   // Update effect message
@@ -421,8 +427,8 @@ function applyCardEffect(card) {
   if (!isGameOver) {
     updateUI();
   } else {
-	  // Force update UI one last time to show final state
-	  updateUI();
+    // Force update UI one last time to show final state
+    updateUI();
   }
 }
 
